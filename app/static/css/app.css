@@ -1,0 +1,15 @@
+:root { --bs-primary: #0b5a8f; --bs-primary-rgb: 11, 90, 143; }
+body { background: #f5f7fa; color: #25364a; }
+.navbar { background: linear-gradient(115deg, #074a77, #0b6da8) !important; }
+.card { border-radius: .75rem; }
+.stat-card { border: 1px solid #e8edf3; transition: transform .15s, box-shadow .15s; }
+.stat-card:hover { transform: translateY(-3px); box-shadow: 0 .4rem 1.2rem rgba(25, 50, 75, .1); }
+.priority-low { color: #198754; font-weight: 600; }
+.priority-medium { color: #a36a00; font-weight: 600; }
+.priority-high { color: #d45400; font-weight: 700; }
+.priority-critical { color: #b02a37; font-weight: 700; }
+.description { white-space: pre-wrap; }
+.attachment-thumb { width: 8rem; height: 6rem; object-fit: cover; border-radius: .5rem; border: 1px solid #e8edf3; transition: transform .15s; }
+.attachment-thumb:hover { transform: scale(1.04); box-shadow: 0 .4rem 1rem rgba(25, 50, 75, .15); }
+.auth-page { min-height: calc(100vh - 12rem); align-items: center; }
+footer { background: #fff; }

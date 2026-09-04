@@ -1,0 +1,1 @@
+# Flask-Migrate scripts are generated here with: flask --app run.py db init

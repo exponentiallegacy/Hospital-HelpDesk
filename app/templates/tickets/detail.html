@@ -1,0 +1,133 @@
+{% extends 'base.html' %}
+{% block content %}
+{% set badge = {'Open': 'text-bg-danger', 'Triaged': 'text-bg-warning', 'Assigned': 'text-bg-info', 'In Progress': 'text-bg-primary', 'Awaiting Parts': 'text-bg-secondary', 'Resolved': 'text-bg-success', 'Closed': 'text-bg-dark'} %}
+<a href="{{ url_for('main.tickets') }}" class="text-decoration-none small"><i class="bi bi-arrow-left"></i> Back to tickets</a>
+<div class="d-flex flex-wrap justify-content-between align-items-start mt-3 mb-3">
+  <div>
+    <h1 class="h2 mb-1">#{{ ticket.id }} — {{ ticket.title }}</h1>
+    <span class="badge {{ badge.get(ticket.status, 'text-bg-secondary') }} me-2">{{ ticket.status }}</span>
+    <span class="priority-{{ ticket.priority|lower }} fw-semibold">{{ ticket.priority }} priority</span>
+  </div>
+  <small class="text-muted mt-2">Reported {{ ticket.created_at.strftime('%d %B %Y, %H:%M') }}</small>
+</div>
+
+{% set status_index = status_order.index(ticket.status) if ticket.status in status_order else 0 %}
+<div class="d-flex flex-wrap align-items-center gap-1 mb-4">
+  {% for s in status_order %}
+    <span class="badge {{ 'text-bg-primary' if loop.index0 == status_index else ('text-bg-success' if loop.index0 < status_index else 'text-bg-light text-secondary border') }}">{{ s }}</span>
+    {% if not loop.last %}<span class="text-muted small">→</span>{% endif %}
+  {% endfor %}
+</div>
+
+<div class="row g-4">
+  <div class="col-lg-7">
+    <div class="card border-0 shadow-sm mb-4"><div class="card-body">
+      <h2 class="h5">Fault description</h2>
+      <p class="mb-0 description">{{ ticket.description }}</p>
+    </div></div>
+
+    {% if ticket.resolution %}
+    <div class="card border-0 shadow-sm mb-4"><div class="card-body">
+      <h2 class="h5 text-success"><i class="bi bi-check-circle me-1"></i>Resolution</h2>
+      <p class="mb-0 description">{{ ticket.resolution }}</p>
+      {% if ticket.resolved_at %}<p class="small text-muted mt-2 mb-0">Resolved {{ ticket.resolved_at.strftime('%d %B %Y, %H:%M') }}</p>{% endif %}
+    </div></div>
+    {% endif %}
+
+    {% if ticket.attachments %}
+    <div class="card border-0 shadow-sm mb-4"><div class="card-body">
+      <h2 class="h5"><i class="bi bi-camera me-1"></i>Photos</h2>
+      <div class="d-flex flex-wrap gap-3">
+        {% for attachment in ticket.attachments %}
+        <a href="{{ url_for('main.view_attachment', ticket_id=ticket.id, attachment_id=attachment.id) }}" target="_blank" title="{{ attachment.original_name }}">
+          <img class="attachment-thumb" src="{{ url_for('main.view_attachment', ticket_id=ticket.id, attachment_id=attachment.id) }}" alt="{{ attachment.original_name }}">
+        </a>
+        <span class="visually-hidden">{{ attachment.original_name }}</span>
+        {% endfor %}
+      </div>
+      {% for attachment in ticket.attachments %}
+      <div class="small text-muted mt-2">{{ attachment.original_name }} · {{ (attachment.size_bytes / 1024)|round(1) }} KB · {{ attachment.uploader.full_name }} · {{ attachment.created_at.strftime('%d %b %Y, %H:%M') }}</div>
+      {% endfor %}
+    </div></div>
+    {% endif %}
+
+    <div class="card border-0 shadow-sm mb-4"><div class="card-body">
+      <h2 class="h5">Activity</h2>
+      {% for comment in comments %}
+      <div class="border-start ps-3 mb-3 {{ 'border-warning' if comment.is_internal }}">
+        <div class="fw-semibold">{{ comment.author.full_name }}
+          {% if comment.is_internal %}<span class="badge text-bg-warning ms-1">Internal note</span>{% endif %}
+          <span class="fw-normal text-muted small">· {{ comment.created_at.strftime('%d %b %Y, %H:%M') }}</span>
+        </div>
+        <div class="description">{{ comment.body }}</div>
+      </div>
+      {% else %}<p class="text-muted mb-0">No updates have been added.</p>{% endfor %}
+    </div></div>
+
+    <div class="card border-0 shadow-sm"><div class="card-body">
+      <h2 class="h5">History</h2>
+      {% for event in events %}
+      <div class="border-start ps-3 mb-2 small">
+        <span class="fw-semibold">{{ event.actor.full_name }}</span>
+        {% if event.event_type == 'created' %} reported the ticket
+        {% elif event.event_type == 'status' %} changed status
+          <span class="badge text-bg-secondary">{{ event.from_value }}</span> → <span class="badge text-bg-primary">{{ event.to_value }}</span>
+        {% elif event.event_type == 'assign' %} {{ 'assigned to ' ~ event.to_value if event.to_value else 'unassigned' }}
+        {% elif event.event_type == 'priority' %} changed priority to {{ event.to_value }}
+        {% elif event.event_type == 'resolution' %} added a resolution
+        {% endif %}
+        <span class="text-muted">· {{ event.created_at.strftime('%d %b, %H:%M') }}</span>
+      </div>
+      {% else %}<p class="text-muted mb-0">No history recorded yet.</p>{% endfor %}
+    </div></div>
+  </div>
+
+  <div class="col-lg-5">
+    <div class="card border-0 shadow-sm mb-4"><div class="card-body">
+      <h2 class="h5">Ticket details</h2>
+      <dl class="row mb-0 small">
+        <dt class="col-5 text-muted">Department</dt><dd class="col-7">{{ ticket.department.name }}</dd>
+        <dt class="col-5 text-muted">Equipment</dt><dd class="col-7">{{ ticket.equipment.name ~ ' (' ~ ticket.equipment.asset_tag ~ ')' if ticket.equipment else 'Not specified' }}</dd>
+        <dt class="col-5 text-muted">Reported by</dt><dd class="col-7">{{ ticket.reporter.full_name }}</dd>
+        <dt class="col-5 text-muted">Technician</dt><dd class="col-7">{{ ticket.technician.full_name if ticket.technician else 'Unassigned' }}</dd>
+        {% set sla = sla_info(ticket) %}{% if sla %}
+        <dt class="col-5 text-muted">SLA (first response)</dt><dd class="col-7">{% if sla.breached %}<span class="badge text-bg-danger">SLA breach</span> <span class="small">target {{ sla.target_hours }}h{% if sla.responded %}, responded in {{ '%.1f'|format(sla.response_hours) }}h{% endif %}</span>{% elif sla.responded %}<span class="badge text-bg-success">On time</span> <span class="small">responded in {{ '%.1f'|format(sla.response_hours) }}h (target {{ sla.target_hours }}h)</span>{% else %}<span class="badge text-bg-light border text-secondary">Due {{ sla.deadline.strftime('%d %b %Y, %H:%M') }}</span> <span class="small">target {{ sla.target_hours }}h</span>{% endif %}</dd>{% endif %}
+        <dt class="col-5 text-muted">Updated</dt><dd class="col-7">{{ ticket.updated_at.strftime('%d %b %Y, %H:%M') }}</dd>
+      </dl>
+    </div></div>
+
+    {% if current_user.has_role('Administrator', 'Technician') %}
+    <div class="card border-0 shadow-sm mb-4"><div class="card-body">
+      <h2 class="h5">Update ticket</h2>
+      <form method="post" novalidate>
+        {{ update_form.hidden_tag() }}
+        <div class="mb-3">
+          {{ update_form.status.label(class='form-label') }}
+          {{ update_form.status(class='form-select') }}
+          {% if update_form.status.choices|length <= 1 %}<div class="form-text">No further transitions from {{ ticket.status }}.</div>{% endif %}
+        </div>
+        <div class="mb-3">{{ update_form.priority.label(class='form-label') }}{{ update_form.priority(class='form-select') }}</div>
+        <div class="mb-3">{{ update_form.technician_id.label(class='form-label') }}{{ update_form.technician_id(class='form-select') }}</div>
+        <div class="mb-3">{{ update_form.resolution.label(class='form-label') }}{{ update_form.resolution(class='form-control', rows='2', placeholder='Describe how the fault was resolved.') }}</div>
+        <div class="mb-3">{{ update_form.internal_note.label(class='form-label') }}{{ update_form.internal_note(class='form-control', rows='2') }}<div class="form-text">Visible only to administrators and technicians.</div></div>
+        <div class="mb-3">{{ update_form.comment.label(class='form-label') }}{{ update_form.comment(class='form-control', rows='2', placeholder='Public update for the reporter.') }}</div>
+        {{ update_form.submit(class='btn btn-primary') }}
+      </form>
+    </div></div>
+    {% else %}
+    <div class="card border-0 shadow-sm"><div class="card-body">
+      <h2 class="h5">Add a comment</h2>
+      <form method="post" novalidate>
+        {{ comment_form.hidden_tag() }}
+        <div class="mb-3">{{ comment_form.body.label(class='form-label') }}{{ comment_form.body(class='form-control', rows='3', placeholder='Ask for an update or provide more information.') }}</div>
+        {% if ticket.status == 'Resolved' %}
+        <div class="alert alert-success py-2"><i class="bi bi-check-circle me-1"></i>This ticket is marked as resolved. Confirm to close it.</div>
+        {{ comment_form.confirm(class='btn btn-success mb-2 w-100') }}
+        {% endif %}
+        {{ comment_form.submit(class='btn btn-outline-primary w-100') }}
+      </form>
+    </div></div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}
